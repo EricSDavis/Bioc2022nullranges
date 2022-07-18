@@ -1,11 +1,10 @@
 pandoc: 2.17.1.1
-pkgdown: 2.0.5
+pkgdown: 2.0.6
 pkgdown_sha: ~
 articles:
-  HOWTO_BUILD_WORKSHOP: HOWTO_BUILD_WORKSHOP.html
-  workshop_example: workshop_example.html
-last_built: 2022-07-14T16:26Z
+  nullranges: nullranges.html
+last_built: 2022-07-18T16:32Z
 urls:
-  reference: https://seandavi.github.io/BuildABiocWorkshop/reference
-  article: https://seandavi.github.io/BuildABiocWorkshop/articles
+  reference: https://ericsdavis.github.io/Bioc2022nullranges/reference
+  article: https://ericsdavis.github.io/Bioc2022nullranges/articles
 
