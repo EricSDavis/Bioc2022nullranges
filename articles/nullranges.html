@@ -106,7 +106,11 @@ approaches for generating null feature sets, <em>matching</em> and
 <p>Subsampling from a pool of features, but controlling for certain
 characteristics.</p>
 </li>
-<li><p>Bootstrapping with bootRanges:</p></li>
+<li>
+<p>Bootstrapping with bootRanges:</p>
+<p>Sampling large blocks of features within the segments from the
+original set with replacement.</p>
+</li>
 </ul>
 <p>In this workshop, we will demonstrate the two major approaches for
 generating null hypothesis genomic ranges with the
@@ -175,8 +179,8 @@ R/Bioconductor with efficient vectorized code for operation on
 <h3 id="background-reading">Background reading<a class="anchor" aria-label="anchor" href="#background-reading"></a>
 </h3>
 <ul>
-<li><a href="https://doi.org/10.1214/10-%7BAOAS363%7D" class="external-link">Subsampling
-Methods for Genomic Inference</a></li>
+<li><a href="https://www.jstor.org/stable/23362444" class="external-link">Subsampling Methods
+for Genomic Inference</a></li>
 <li><a href="https://doi.org/10.1093/pan/mpl013" class="external-link">Matching as
 Nonparametric Preprocessing for Reducing Model Dependence in Parametric
 Causal Inference</a></li>
@@ -478,16 +482,95 @@ among our 3 sets by using the <code><a href="https://nullranges.github.io/nullra
 <div class="section level2">
 <h2 id="block-bootstrapping-with-bootranges">Block bootstrapping with bootRanges<a class="anchor" aria-label="anchor" href="#block-bootstrapping-with-bootranges"></a>
 </h2>
+<div class="section level3">
+<h3 id="biological-background-1">Biological background<a class="anchor" aria-label="anchor" href="#biological-background-1"></a>
+</h3>
+<p>In a segmented block bootstrap, the blocks are sampled and placed
+within regions of a genome <em>segmentation</em>. That is, for a genome
+segmented into states 1,2,…,S, blocks from state <em>s</em> will be used
+to tile the ranges of state <em>s</em> in each bootstrap sample. The
+process can be visualized in (A), a block with length <span class="math inline">\(L_b\)</span> is randomly selected from state “red”
+and move to a tile block across chromosome. Additionally, the workflow
+of bootRanges is diagrammed in (B) and listed as:</p>
+<ol style="list-style-type: decimal">
+<li>Overlap <em>GRanges</em> of feature <span class="math inline">\(x\)</span> and <em>GRanges</em> of feature <span class="math inline">\(y\)</span> to derive interested observed
+statistics</li>
+<li>
+<code><a href="https://nullranges.github.io/nullranges/reference/bootRanges.html" class="external-link">bootRanges()</a></code> with optional <code>segmentation</code>
+and <code>exclude</code> creates a <em>bootRanges</em> object <span class="math inline">\(y'\)</span>
+</li>
+<li>Overlap <em>GRanges</em> of feature <span class="math inline">\(x\)</span> and <span class="math inline">\(y'\)</span> to derive interested bootstrap
+statistics</li>
+<li>
+<span class="math inline">\(z\)</span> test is performed for testing
+the null hypothesis that there is no true biological enrichment</li>
+</ol>
+<p><img src="images/bootRanges.jpg" title="Overview of bootRanges" alt="Overview of bootRanges"></p>
+</div>
+<div class="section level3">
+<h3 id="pre-built-segmentations">Pre-built segmentations<a class="anchor" aria-label="anchor" href="#pre-built-segmentations"></a>
+</h3>
+<p>The segmented block bootstrap has two options, either:</p>
+<ul>
+<li>Perform a de-novo segmentation of the genome using feature density,
+e.g. gene density</li>
+<li>Use exiting segmentation (e.g. ChromHMM, etc.) downloaded from
+AnnotationHub or external to Bioconductor (BED files imported with
+<em>rtracklayer</em>)</li>
+</ul>
+<p><em>nullranges</em> has generated pre-built segmentations for easy
+use using <em>CBS</em> or <em>HMM</em> methods with <span class="math inline">\(L_s=2e6\)</span> considering excludable regions
+can be selected from <em>ExperimentHub</em>.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressPackageStartupMessages</a></span><span class="op">(</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">ExperimentHub</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">eh</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/ExperimentHub/man/ExperimentHub-class.html" class="external-link">ExperimentHub</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co"># query(eh, "nullrangesdata")</span></span>
+<span><span class="va">seg_cbs</span> <span class="op">&lt;-</span> <span class="va">eh</span><span class="op">[[</span><span class="st">"EH7307"</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="va">seg_hmm</span> <span class="op">&lt;-</span> <span class="va">eh</span><span class="op">[[</span><span class="st">"EH7308"</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
+<div class="section level4">
+<h4 id="assessing-segmentation">Assessing segmentation<a class="anchor" aria-label="anchor" href="#assessing-segmentation"></a>
+</h4>
+<p>We next import excluded regions including ENCODE-produced excludable
+regions<span class="citation">(Amemiya, Kundaje, and Boyle 2019)</span>,
+telomeres from UCSC, centromeres <span class="citation">(Commo
+2022)</span>. For easy use, pre-combined excludable regions is stored in
+<em>ExperimentHub.</em></p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">exclude</span> <span class="op">&lt;-</span> <span class="va">eh</span><span class="op">[[</span><span class="st">"EH7306"</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="co">#&gt; see ?nullrangesData and browseVignettes('nullrangesData') for documentation</span></span>
+<span><span class="co">#&gt; loading from cache</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
+<span><span class="va">plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ranges"</span>,<span class="st">"barplot"</span>,<span class="st">"boxplot"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">t</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://nullranges.github.io/nullranges/reference/plotSegment.html" class="external-link">plotSegment</a></span><span class="op">(</span><span class="va">seg_cbs</span>, <span class="va">exclude</span>, type <span class="op">=</span> <span class="va">t</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="va">plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
+<p><img src="nullranges_files/figure-html/unnamed-chunk-14-1.png" width="700"></p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span> <span class="va">plots</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span></span></code></pre></div>
+<p><img src="nullranges_files/figure-html/unnamed-chunk-14-2.png" width="700">
+### Use with Plyranges</p>
+</div>
+</div>
 </div>
 <div class="section level2 unnumbered">
 <h2 class="unnumbered" id="additional-references">Additional references<a class="anchor" aria-label="anchor" href="#additional-references"></a>
 </h2>
 <div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-encode_exclude" class="csl-entry">
+Amemiya, Haley M, Anshul Kundaje, and Alan P Boyle. 2019. <span>“The
+<span>ENCODE</span> Blacklist: Identification of Problematic Regions of
+the Genome.”</span> <em>Scientific Reports</em> 9 (1): 9354. <a href="https://doi.org/10.1038/s41598-019-45839-z" class="external-link">https://doi.org/10.1038/s41598-019-45839-z</a>.
+</div>
 <div id="ref-bickel_2010" class="csl-entry">
 Bickel, Peter J., Nathan Boley, James B. Brown, Haiyan Huang, and Nancy
 R. Zhang. 2010. <span>“Subsampling Methods for Genomic
 Inference.”</span> <em>The Annals of Applied Statistics</em> 4 (4):
 1660–97. <a href="https://doi.org/10.1214/10-%7BAOAS363%7D" class="external-link">https://doi.org/10.1214/10-{AOAS363}</a>.
+</div>
+<div id="ref-rCGH" class="csl-entry">
+Commo, Frederic. 2022. <em>rCGH: Comprehensive Pipeline for Analyzing
+and Visualizing Array-Based CGH Data</em>. <a href="https://github.com/fredcommo/rCGH" class="external-link">https://github.com/fredcommo/rCGH</a>.
 </div>
 <div id="ref-de_2014" class="csl-entry">
 De, Subhajyoti, Brent S Pedersen, and Katerina Kechris. 2014. <span>“The
