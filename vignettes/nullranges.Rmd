@@ -40,6 +40,8 @@ approaches for generating null feature sets, *matching* and
 
 * Bootstrapping with bootRanges:
     
+    Sampling large blocks of features within the segments from the original set
+with replacement.
 
 In this workshop, we will demonstrate the two major approaches for
 generating null hypothesis genomic ranges with the `nullranges`
@@ -101,7 +103,7 @@ R/Bioconductor with efficient vectorized code for operation on
 
 ### Background reading
 
-* [Subsampling Methods for Genomic Inference](https://doi.org/10.1214/10-%7BAOAS363%7D)
+* [Subsampling Methods for Genomic Inference](https://www.jstor.org/stable/23362444)
 * [Matching as Nonparametric Preprocessing for Reducing Model Dependence in Parametric Causal Inference](https://doi.org/10.1093/pan/mpl013)
 
 ### Participation
@@ -306,6 +308,68 @@ barplot(height = c(g1, g2, g3),
 
 
 ## Block bootstrapping with bootRanges
+
+### Biological background
+
+In a segmented block bootstrap, the blocks are sampled and placed within
+regions of a genome *segmentation*. That is, for a genome segmented into
+states 1,2,...,S, blocks from state *s* will be used to tile the ranges
+of state *s* in each bootstrap sample. The process can be visualized in
+(A), a block with length $L_b$ is randomly selected from state "red" and
+move to a tile block across chromosome. Additionally, the workflow of
+bootRanges is diagrammed in (B) and listed as:
+
+1.  Overlap *GRanges* of feature $x$ and *GRanges* of feature $y$ to
+    derive interested observed statistics
+2.  `bootRanges()` with optional `segmentation` and `exclude` creates a
+    *bootRanges* object $y'$
+3.  Overlap *GRanges* of feature $x$ and $y'$ to derive interested
+    bootstrap statistics
+4.  $z$ test is performed for testing the null hypothesis that there is
+    no true biological enrichment
+    
+```{r, echo=FALSE, fig.alt="Overview of bootRanges"}
+knitr::include_graphics("images/bootRanges.jpg")
+```
+
+### Pre-built segmentations
+
+The segmented block bootstrap has two options, either:
+
+-   Perform a de-novo segmentation of the genome using feature density,
+    e.g. gene density
+-   Use exiting segmentation (e.g. ChromHMM, etc.) downloaded from
+    AnnotationHub or external to Bioconductor (BED files imported with
+    *rtracklayer*)
+    
+*nullranges* has generated pre-built segmentations for easy use using *CBS* or *HMM* methods with $L_s=2e6$ considering excludable
+regions can be selected from *ExperimentHub*.
+
+```{r, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(ExperimentHub))
+eh = ExperimentHub()
+# query(eh, "nullrangesdata")
+seg_cbs <- eh[["EH7307"]]
+seg_hmm <- eh[["EH7308"]]
+```
+#### Assessing segmentation 
+
+We next import excluded regions including ENCODE-produced excludable
+regions[@encode_exclude], telomeres from UCSC, centromeres [@rCGH]. For
+easy use, pre-combined excludable regions is stored in *ExperimentHub.*
+```{r}
+exclude <- eh[["EH7306"]]
+```
+
+```{r}
+library(patchwork)
+plots <- lapply(c("ranges","barplot","boxplot"), function(t) {
+  plotSegment(seg_cbs, exclude, type = t)
+})
+plots[[1]]
+plots[[2]] + plots[[3]]
+```
+### Use with Plyranges
 
 
 ## Additional references
