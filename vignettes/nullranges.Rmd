@@ -149,44 +149,40 @@ An example for a 45-minute workshop:
 
 ## Matching covariates with matchRanges
 
-The following content is an excerpt from the vignette
-[Case study I: CTCF occupancy](https://nullranges.github.io/nullranges/articles/matching_granges.html) from the nullranges package.
+### Overview
 
-In this vignette we demonstrate generating covariate-matched,
-null-hypothesis GRanges using the `matchRanges()` function to test for
-the occupancy of CCCTC-binding factor (CTCF) at chromatin loop
-anchors. 
+`matchRanges()` allows users to subsample a pool of ranges such that
+the resulting matched set contains similar distributions of 
+covariates (i.e., genomic features) as a focal set of interest.
+
+```{r, echo=FALSE, fig.alt="Overview of MatchGRanges"}
+knitr::include_graphics("images/MatchedGRanges.png")
+```
+
+Resulting sets can then be compared, without potential confounding
+effects from covariates.
 
 ### Biological background
 
-One of the fundamental principles of chromatin-looping suggests that
-most loops are bound at both ends by the CTCF transcription factor
-(TF). CTCF-bound loops can be formed by loop-extrusion, where the
-ring-like cohesin complex extrudes chromatin until stopped by bound
-CTCF. By this mechanism, we expect most loop anchors will be bound by
-CTCF. 
+Most chromatin loops are formed in a processes called loop extrusion,
+where the ring-like cohesin complex extrudes chromatin until stopped
+by bound CTCF transcription factors (TFs). Therefore, most chromatin
+loops tend to be bound at both ends by CTCF. However, the anchors of
+chromatin loops are also located in accessible chromatin regions and
+act as potential confounders.
 
 ```{r echo=FALSE, fig.alt="CTCF-bound DNA Looping", out.width="50%", fig.align='center'}
 knitr::include_graphics("images/ctcfBoundLooping.png")
 ```
 
-While we could test this hypothesis by simple overlap or permutation
-testing, these approaches fail to account for non-uniformly
-distributed covariate genomic features. For example, loop anchors are
-commonly bound by CTCF and located in open chromatin regions. We can
-use `matchRanges()` to test for CTCF occupancy at loop anchors
-controlling for open chromatin regions. 
+Suppose we wanted to compare CTCF occupancy between the anchors of
+looped ranges and unlooped ranges. `matchRanges()` can help by 
+generating a null set of ranges controlling for potential
+confounding by chromatin accessibility.
 
-Here, we generate a set of null-hypothesis GRanges to more rigorously
-test CTCF occupancy at loop anchors independently from open chromatin
-regions. We use the `hg19_10kb_bins` dataset from the
-`nullrangesData` package, which contains ranges for every 10Kb bin
-along the genome with CTCF, DNase, and loop feature annotations from
-GM12878 (see `?nullrangesData::hg19_10kb_bins`). 
-
-```{r, echo=FALSE, fig.alt="Overview of MatchGRanges"}
-knitr::include_graphics("images/MatchedGRanges.png")
-```
+The `hg19_10kb_bins` dataset from the `nullrangesData` package
+contains ranges for every 10Kb bin along the genome with CTCF,
+DNase, and loop feature annotations fromGM12878 (see `?nullrangesData::hg19_10kb_bins`).
 
 ### Matching with `matchRanges()`
 
@@ -256,25 +252,23 @@ the mean and standard deviation between each matched set. For
 categorical covariates, such as `n_dnase_sites`, `overview()` reports
 the number of observations per category and matched set. The bottom
 section shows the mean and s.d (or n, for factors) difference between
-focal and matched sets. 
-
-`overview()` also summarizes the propensity scores for each set to
-give a quick idea of overall matching quality. 
+focal and matched sets.
 
 #### Visualizing matching results
 
-Let's visualize overall matching quality by plotting propensity scores
+Let's visualize covariate balance by plotting propensity scores
 for the focal, pool, and matched sets: 
 
 ```{r, message=FALSE}
 plotPropensity(mgr, sets = c('f', 'p', 'm'), type = 'ridges')
 ```
 
-From this plot, it is clear that the matched set is much closer to the focal set than the pool set.
+These plots show that the distributions of covariates
+in the matched set are similar to the focal set.
 
 We can ensure that covariate distributions have been matched
 appropriately by using the `covariates()` function to extract matched
-covariates along with `patchwork` and `plotCovarite` to visualize all
+covariates along with `patchwork` and `plotCovariate` to visualize all
 distributions: 
 
 ```{r, message=FALSE, warning=FALSE, fig.height=6, fig.width=5}
