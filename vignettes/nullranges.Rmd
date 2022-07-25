@@ -143,6 +143,7 @@ An example for a 45-minute workshop:
     * Compare biological results
 * bootRanges
     * Generate block bootstrapped null sets of GenomicRanges
+    * Assess quality of subsampling sets
     * Use with plyranges to derive biological results
 
 
@@ -346,6 +347,7 @@ bootRanges is diagrammed in (B) and listed as:
 ```{r, echo=FALSE, fig.alt="Overview of bootRanges"}
 knitr::include_graphics("images/bootRanges.jpg")
 ```
+
 ### Segmented block bootstrap
 
 We use a set of DNase hypersensitivity sites (DHS) from the ENCODE
@@ -405,7 +407,7 @@ easy use, pre-combined excludable regions is stored in *ExperimentHub.*
 ```{r}
 exclude <- eh[["EH7306"]]
 ```
-#### Use with Plyranges
+#### Subsampling with bootRanges()
 Now we apply a segmented block bootstrap with blocks of size 500kb, to
 the peaks. Here we show generation of 50 iterations of a block bootstrap
 followed by a typical overlap analysis using *plyranges* [@Lee2019]. (We
@@ -424,6 +426,45 @@ What is returned here? The `bootRanges` function returns a *bootRanges*
 object, which is a simple sub-class of *GRanges*. The iteration (`iter`)
 and the block length (`blockLength`) are recorded as metadata columns,
 accessible via `mcols`. 
+
+### Assessing quality of subsampling
+
+We can examine properties of permuted y over iterations, and compare to the original y. To do so, we first add the original features as iter=0. Below code look at distributions of various aspects, e.g. here the width of features, across a few of the bootstraps and the original feature set y
+
+```{r, warning=FALSE}
+suppressPackageStartupMessages(library(ggridges))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(purrr))
+interdist <- function(dat) {
+    x = dat[-1,]
+    y = dat[-nrow(dat),]
+    ifelse(x$seqnames == y$seqnames, x$start + floor((x$width - 1)/2) - y$start-floor((y$width - 1)/2), NA)}
+combined <- dhs %>% 
+  mutate(iter=0) %>%
+  bind_ranges(boots) %>% 
+  plyranges::select(iter)
+stats <- combined %>% 
+  group_by(iter) %>%
+  summarize(n = n()) %>%
+  as_tibble()
+
+combined %>% plyranges::filter(iter %in% 0:3) %>%
+  plyranges::select(iter) %>%
+  as.data.frame() %>% 
+  nest(-iter) %>%
+  mutate(interdist = map(data, ~interdist(.))) %>% 
+  select(iter,interdist) %>% 
+  unnest(interdist) %>% 
+  mutate(type = ifelse(iter == 0, "original", "boot")) %>% 
+  ggplot(aes(log10(interdist), iter, fill=type)) +
+  geom_density_ridges(alpha = 0.75) +
+  geom_text(data=head(stats,3),
+            aes(x=2, y=iter, label=paste0("n=",n), fill=NULL),
+            vjust=1.5)
+
+```
+
+### Derive interested statistics
 
 Suppose we have a set of features `x` and we are interested in
 evaluating the overlap of this set with the DHS. We can calculate for
@@ -446,7 +487,6 @@ Note that we need to use `tidyr::complete` in order to fill in
 combinations of `x` and `iter` where the overlap was 0.
 
 ```{r}
-suppressPackageStartupMessages(library(tidyr))
 boot_stats <- x %>% join_overlap_inner(boots) %>%
   group_by(x_id, iter) %>%
   summarize(n_overlaps = n()) %>%
@@ -475,7 +515,7 @@ For more examples of combining `bootRanges` from *nullranges* with
 [tidy-ranges-tutorial](https://nullranges.github.io/tidy-ranges-tutorial/bootstrap-overlap.html)
 book.
 
-### Other Usage
+### Extension
 
 #### Optimized effect size threshold
 
@@ -511,7 +551,6 @@ cor_whole<-rna %>% join_overlap_inner(bootranges, maxgap=1000) %>%
 
 ```{r, eval=FALSE}
 library(tidySummarizedExperiment)
-library(purrr)
 # make an SE where each row is an overlap
 se_rna <- SummarizedExperiment(
   assays=list(rna=rna.scaled),
