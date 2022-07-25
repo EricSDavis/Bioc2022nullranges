@@ -267,34 +267,34 @@ Causal Inference</a></li>
 <div class="section level2">
 <h2 id="matching-covariates-with-matchranges">Matching covariates with matchRanges<a class="anchor" aria-label="anchor" href="#matching-covariates-with-matchranges"></a>
 </h2>
-<p>The following content is an excerpt from the vignette <a href="https://nullranges.github.io/nullranges/articles/matching_granges.html" class="external-link">Case
-study I: CTCF occupancy</a> from the nullranges package.</p>
-<p>In this vignette we demonstrate generating covariate-matched,
-null-hypothesis GRanges using the <code><a href="https://nullranges.github.io/nullranges/reference/matchRanges.html" class="external-link">matchRanges()</a></code> function to
-test for the occupancy of CCCTC-binding factor (CTCF) at chromatin loop
-anchors.</p>
+<div class="section level3">
+<h3 id="overview-1">Overview<a class="anchor" aria-label="anchor" href="#overview-1"></a>
+</h3>
+<p><code><a href="https://nullranges.github.io/nullranges/reference/matchRanges.html" class="external-link">matchRanges()</a></code> allows users to subsample a pool of ranges
+such that the resulting matched set contains similar distributions of
+covariates (i.e., genomic features) as a focal set of interest.</p>
+<p><img src="images/MatchedGRanges.png" title="Overview of MatchGRanges" alt="Overview of MatchGRanges" width="1275"></p>
+<p>Resulting sets can then be compared, without potential confounding
+effects from covariates.</p>
+</div>
 <div class="section level3">
 <h3 id="biological-background">Biological background<a class="anchor" aria-label="anchor" href="#biological-background"></a>
 </h3>
-<p>One of the fundamental principles of chromatin-looping suggests that
-most loops are bound at both ends by the CTCF transcription factor (TF).
-CTCF-bound loops can be formed by loop-extrusion, where the ring-like
-cohesin complex extrudes chromatin until stopped by bound CTCF. By this
-mechanism, we expect most loop anchors will be bound by CTCF.</p>
+<p>Most chromatin loops are formed in a processes called loop extrusion,
+where the ring-like cohesin complex extrudes chromatin until stopped by
+bound CTCF transcription factors (TFs). Therefore, most chromatin loops
+tend to be bound at both ends by CTCF. However, the anchors of chromatin
+loops are also located in accessible chromatin regions and act as
+potential confounders.</p>
 <p><img src="images/ctcfBoundLooping.png" title="CTCF-bound DNA Looping" alt="CTCF-bound DNA Looping" width="50%" style="display: block; margin: auto;"></p>
-<p>While we could test this hypothesis by simple overlap or permutation
-testing, these approaches fail to account for non-uniformly distributed
-covariate genomic features. For example, loop anchors are commonly bound
-by CTCF and located in open chromatin regions. We can use
-<code><a href="https://nullranges.github.io/nullranges/reference/matchRanges.html" class="external-link">matchRanges()</a></code> to test for CTCF occupancy at loop anchors
-controlling for open chromatin regions.</p>
-<p>Here, we generate a set of null-hypothesis GRanges to more rigorously
-test CTCF occupancy at loop anchors independently from open chromatin
-regions. We use the <code>hg19_10kb_bins</code> dataset from the
-<code>nullrangesData</code> package, which contains ranges for every
-10Kb bin along the genome with CTCF, DNase, and loop feature annotations
-from GM12878 (see <code><a href="https://rdrr.io/pkg/nullrangesData/man/hg19_10kb_bins.html" class="external-link">?nullrangesData::hg19_10kb_bins</a></code>).</p>
-<p><img src="images/MatchedGRanges.png" title="Overview of MatchGRanges" alt="Overview of MatchGRanges" width="1275"></p>
+<p>Suppose we wanted to compare CTCF occupancy between the anchors of
+looped ranges and unlooped ranges. <code><a href="https://nullranges.github.io/nullranges/reference/matchRanges.html" class="external-link">matchRanges()</a></code> can help
+by generating a null set of ranges controlling for potential confounding
+by chromatin accessibility.</p>
+<p>The <code>hg19_10kb_bins</code> dataset from the
+<code>nullrangesData</code> package contains ranges for every 10Kb bin
+along the genome with CTCF, DNase, and loop feature annotations
+fromGM12878 (see <code><a href="https://rdrr.io/pkg/nullrangesData/man/hg19_10kb_bins.html" class="external-link">?nullrangesData::hg19_10kb_bins</a></code>).</p>
 </div>
 <div class="section level3">
 <h3 id="matching-with-matchranges">Matching with <code>matchRanges()</code><a class="anchor" aria-label="anchor" href="#matching-with-matchranges"></a>
@@ -435,22 +435,20 @@ each matched set. For categorical covariates, such as
 of observations per category and matched set. The bottom section shows
 the mean and s.d (or n, for factors) difference between focal and
 matched sets.</p>
-<p><code><a href="https://nullranges.github.io/nullranges/reference/overview.html" class="external-link">overview()</a></code> also summarizes the propensity scores for
-each set to give a quick idea of overall matching quality.</p>
 <div class="section level4">
 <h4 id="visualizing-matching-results">Visualizing matching results<a class="anchor" aria-label="anchor" href="#visualizing-matching-results"></a>
 </h4>
-<p>Let’s visualize overall matching quality by plotting propensity
-scores for the focal, pool, and matched sets:</p>
+<p>Let’s visualize covariate balance by plotting propensity scores for
+the focal, pool, and matched sets:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://nullranges.github.io/nullranges/reference/plotPropensity.html" class="external-link">plotPropensity</a></span><span class="op">(</span><span class="va">mgr</span>, sets <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'f'</span>, <span class="st">'p'</span>, <span class="st">'m'</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">'ridges'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nullranges_files/figure-html/unnamed-chunk-8-1.png" width="700"></p>
-<p>From this plot, it is clear that the matched set is much closer to
-the focal set than the pool set.</p>
+<p>These plots show that the distributions of covariates in the matched
+set are similar to the focal set.</p>
 <p>We can ensure that covariate distributions have been matched
 appropriately by using the <code><a href="https://nullranges.github.io/nullranges/reference/covariates.html" class="external-link">covariates()</a></code> function to extract
 matched covariates along with <code>patchwork</code> and
-<code>plotCovarite</code> to visualize all distributions:</p>
+<code>plotCovariate</code> to visualize all distributions:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
 <span><span class="va">plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://nullranges.github.io/nullranges/reference/covariates.html" class="external-link">covariates</a></span><span class="op">(</span><span class="va">mgr</span><span class="op">)</span>, <span class="va">plotCovariate</span>, x<span class="op">=</span><span class="va">mgr</span>, sets <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'f'</span>, <span class="st">'m'</span>, <span class="st">'p'</span><span class="op">)</span><span class="op">)</span></span>
@@ -510,7 +508,7 @@ variance of the null distribution.</p>
 <p><img src="images/comparsion.jpeg" title="Histogram comparison" alt="Histogram comparison" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level3">
-<h3 id="overview-1">Overview<a class="anchor" aria-label="anchor" href="#overview-1"></a>
+<h3 id="overview-2">Overview<a class="anchor" aria-label="anchor" href="#overview-2"></a>
 </h3>
 <p>In a segmented block bootstrap, the blocks are sampled and placed
 within regions of a genome <em>segmentation</em>. That is, for a genome
