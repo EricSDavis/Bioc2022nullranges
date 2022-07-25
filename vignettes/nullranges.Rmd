@@ -447,9 +447,6 @@ combinations of `x` and `iter` where the overlap was 0.
 
 ```{r}
 suppressPackageStartupMessages(library(tidyr))
-```
-
-```{r}
 boot_stats <- x %>% join_overlap_inner(boots) %>%
   group_by(x_id, iter) %>%
   summarize(n_overlaps = n()) %>%
@@ -470,7 +467,7 @@ overlap with bootstrapped data.
 
 ```{r boot-hist}
 ggplot(boot_stats, aes(meanOverlaps)) +
-  geom_histogram(binwidth=.2)
+  geom_histogram(binwidth=.1)
 ```
 
 For more examples of combining `bootRanges` from *nullranges* with
@@ -484,7 +481,7 @@ book.
 
 Penalized splines across a range of effect sizes on the null sets can be modeled, through which to derive confidence interval at the same time on every effect size. Therefore, an optimized effect size threshold could be derived, eg. rather than limiting DEG logFC at a arbitrary threshold.
 
-```{r, echo=FALSE, fig.alt="effect size",fig.align='center'}
+```{r, echo=FALSE, fig.alt="effect size",fig.width=5, fig.height=2,fig.align='center'}
 knitr::include_graphics("images/effectSize.jpeg")
 ```
 

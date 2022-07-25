@@ -36,6 +36,7 @@ Suggests:
     GenomicRanges,
     nullranges,
     nullrangesData,
+    tidyr
     plyranges,
     ggplot2,
     patchwork
