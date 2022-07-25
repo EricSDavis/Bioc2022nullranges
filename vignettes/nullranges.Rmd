@@ -142,6 +142,8 @@ An example for a 45-minute workshop:
     * Assess quality of matching
     * Compare biological results
 * bootRanges
+    * Generate block bootstrapped null sets of GenomicRanges
+    * Use with plyranges to derive biological results
 
 
 ## Matching covariates with matchRanges
@@ -309,6 +311,19 @@ barplot(height = c(g1, g2, g3),
 
 ## Block bootstrapping with bootRanges
 
+One strategy for generating a null distribution from no pool-set data set is to
+permute or shuffle the genomic features, possibly while considering an exclusion list of regions where features should not be located. However, genomic feature sets often exists a
+complex dependency structure, both in terms of placement and correlation
+of metadata (signal strength, cell-type-specificity, etc.) and naive permutation ignore the dependence between positions and thus won't exhibits natural clumping properties. Alternative way is to generate random feature sets by sampling large blocks of features within the segments from the original set with replacement, proposed by @bickel_2010.
+```{r, echo=FALSE, fig.alt="bootRanges motivation",fig.width=5, fig.height=2,fig.align='center'}
+knitr::include_graphics("images/UCSC.jpg")
+```
+Here are histograms shows various ways of estimating the null distribution of overlaps between two sequences, with the true null on top. The block bootstrap can do a much better job of estimating the variance of the null distribution.
+
+```{r, echo=FALSE, fig.alt="Histogram comparison",fig.align='center'}
+knitr::include_graphics("images/comparsion.jpeg")
+```
+
 ### Biological background
 
 In a segmented block bootstrap, the blocks are sampled and placed within
@@ -331,8 +346,40 @@ bootRanges is diagrammed in (B) and listed as:
 ```{r, echo=FALSE, fig.alt="Overview of bootRanges"}
 knitr::include_graphics("images/bootRanges.jpg")
 ```
+### Segmented block bootstrap
 
-### Pre-built segmentations
+We use a set of DNase hypersensitivity sites (DHS) from the ENCODE
+project [@encode] in A549 cell line (ENCSR614GWM). Here, for speed, we
+work with a pre-processed data object from ExperimentHub, created using
+the following steps:
+
+-   Download ENCODE DNase hypersensitive peaks in A549 from
+    *AnnotationHub*
+-   Subset to standard chromosomes and remove mitochondrial DNA
+-   Use a chain file from UCSC to lift ranges from hg19 to hg38
+-   Sort the DHS features to be bootstrapped
+
+These steps are included in *nullrangesData* in the
+`inst/scripts/make-dhs-data.R` script.
+
+For speed of the vignette, we restrict to a smaller number of DHS,
+filtering by the signal value. We also remove metadata columns that we
+don't need for the bootstrap analysis. Consider, when creating
+bootstrapped data, that you will be creating an object many times larger
+than your original features, so filtering and trimming extra metadata
+can help make the analysis more efficient.
+
+
+```{r}
+dhs <- DHSA549Hg38()
+dhs <- dhs %>% plyranges::filter(signalValue > 100) %>%
+  mutate(id = seq_along(.)) %>%
+  plyranges::select(id)
+length(dhs)
+table(seqnames(dhs))
+```
+
+#### Pre-built segmentations
 
 The segmented block bootstrap has two options, either:
 
@@ -342,17 +389,15 @@ The segmented block bootstrap has two options, either:
     AnnotationHub or external to Bioconductor (BED files imported with
     *rtracklayer*)
     
-*nullranges* has generated pre-built segmentations for easy use using *CBS* or *HMM* methods with $L_s=2e6$ considering excludable
-regions can be selected from *ExperimentHub*.
+*nullranges* has generated pre-built segmentations for easy use using *CBS* or *HMM* methods under hg38 with $L_s=2e6$ considering excludable regions can be selected from *ExperimentHub*. Assessment of segmentation through ranges plot, bar plot and box plot could be plotted by `plotSegment()`. Detailed Usage is shown in vignette [Segmented block bootstrap](https://nullranges.github.io/nullranges/articles/segmented_boot_ranges.html) from the nullranges package.
 
 ```{r, message=FALSE, warning=FALSE}
 suppressPackageStartupMessages(library(ExperimentHub))
 eh = ExperimentHub()
 # query(eh, "nullrangesdata")
 seg_cbs <- eh[["EH7307"]]
-seg_hmm <- eh[["EH7308"]]
 ```
-#### Assessing segmentation 
+#### Import excluded regions 
 
 We next import excluded regions including ENCODE-produced excludable
 regions[@encode_exclude], telomeres from UCSC, centromeres [@rCGH]. For
@@ -360,16 +405,148 @@ easy use, pre-combined excludable regions is stored in *ExperimentHub.*
 ```{r}
 exclude <- eh[["EH7306"]]
 ```
+#### Use with Plyranges
+Now we apply a segmented block bootstrap with blocks of size 500kb, to
+the peaks. Here we show generation of 50 iterations of a block bootstrap
+followed by a typical overlap analysis using *plyranges* [@Lee2019]. (We
+might normally do 100 iterations or more, depending on the granularity
+of the bootstrap distribution that is needed.)
 
 ```{r}
-library(patchwork)
-plots <- lapply(c("ranges","barplot","boxplot"), function(t) {
-  plotSegment(seg_cbs, exclude, type = t)
-})
-plots[[1]]
-plots[[2]] + plots[[3]]
+set.seed(5) # for reproducibility
+R <- 10
+blockLength <- 5e5
+boots <- bootRanges(dhs, blockLength, R = R, seg = seg_cbs, exclude=exclude)
+boots
 ```
-### Use with Plyranges
+
+What is returned here? The `bootRanges` function returns a *bootRanges*
+object, which is a simple sub-class of *GRanges*. The iteration (`iter`)
+and the block length (`blockLength`) are recorded as metadata columns,
+accessible via `mcols`. 
+
+Suppose we have a set of features `x` and we are interested in
+evaluating the overlap of this set with the DHS. We can calculate for
+example the mean observed number of overlaps for features in `x` (or
+something more complicated, e.g. the maximum log fold change or signal
+value for DHS peaks within a `maxgap` window of `x`).
+
+```{r}
+x <- GRanges("chr2", IRanges(1 + 50:99 * 1e6, width=1e6), x_id=1:50)
+x <- x %>% mutate(n_overlaps = count_overlaps(., dhs))
+mean( x$n_overlaps )
+```
+
+We can repeat this with the bootstrapped features using a `group_by`
+command, a `summarize`, followed by a second `group_by` and `summarize`.
+It may help to step through these commands one by one to understand what
+the intermediate output is.
+
+Note that we need to use `tidyr::complete` in order to fill in
+combinations of `x` and `iter` where the overlap was 0.
+
+```{r}
+suppressPackageStartupMessages(library(tidyr))
+```
+
+```{r}
+boot_stats <- x %>% join_overlap_inner(boots) %>%
+  group_by(x_id, iter) %>%
+  summarize(n_overlaps = n()) %>%
+  as.data.frame() %>%
+  complete(x_id, iter, fill=list(n_overlaps = 0)) %>%
+  group_by(iter) %>%
+  summarize(meanOverlaps = mean(n_overlaps))
+```
+
+The above code, first grouping by `x_id` and `iter`, then subsequently
+by `iter` is general and allows for more complex analysis than just mean
+overlap (e.g. how many times an `x` range has 1 or more overlap, what is
+the mean or max signal value for peaks overlapping ranges in `x`, etc.).
+
+Finally we can plot a histogram. In this case, as the `x` features were
+arbitrary, our observed value falls within the distribution of mean
+overlap with bootstrapped data.
+
+```{r boot-hist}
+ggplot(boot_stats, aes(meanOverlaps)) +
+  geom_histogram(binwidth=.2)
+```
+
+For more examples of combining `bootRanges` from *nullranges* with
+*plyranges* piped operations, see the relevant chapter in the
+[tidy-ranges-tutorial](https://nullranges.github.io/tidy-ranges-tutorial/bootstrap-overlap.html)
+book.
+
+### Other Usage
+
+#### Optimized effect size threshold
+
+Penalized splines across a range of effect sizes on the null sets can be modeled, through which to derive confidence interval at the same time on every effect size. Therefore, an optimized effect size threshold could be derived, eg. rather than limiting DEG logFC at a arbitrary threshold.
+
+```{r, echo=FALSE, fig.alt="effect size",fig.align='center'}
+knitr::include_graphics("images/effectSize.jpeg")
+```
+
+#### Utilizing count matrix from other data formats
+
+*BootRanges* is flexible on deriving any interested statistics through genome position, but also is flexible on data format, eg. *SummerizedExperiment*. One case study is to assess the correlation of the all pairs of genes and promoter peaks from Chromium Single Cell Multiome ATAC + Gene Expression. There are two option pipelines to follow after generating a GRanges object and extracting count matrix from *SingleCellExperiment*. One is saving the count matrix in GRanges's metadata column as a `NumericList()` format and use *Plyranges* in downstream analysis. Another one is create a *tidySummarizedExperiment* object where each row save derived an interested statistics.
+
+1) Plyrangs pseudo code
+```{r, eval=FALSE}
+## split sparse count matrix into NumericList
+rna <- rna_Granges[-which(rna.sd==0)] %>%
+  mutate(counts1 = NumericList(asplit(rna.scaled, 1)))%>% sort()
+promoter <- promoter_Granges[-which(promoter.sd==0)] %>%
+  mutate(counts2 = NumericList(asplit(promoter.scaled, 1))) %>% sort()
+
+bootranges <- bootRanges(promoter,blockLength = 5e5,R=R,type = "bootstrap", withinChrom = F)
+## draw mean correlation distribution plot
+cor_whole<-rna %>% join_overlap_inner(bootranges, maxgap=1000) %>%
+  mutate(rho = 1/(n(col)-1) * sum(counts1 * counts2)) %>%
+  select(rho,iter) %>%
+  group_by(iter) %>%
+  summarise(meanCor = mean(rho)) %>%
+  as.data.frame()
+```
+
+2) TidySE pesudo code
+
+```{r, eval=FALSE}
+library(tidySummarizedExperiment)
+library(purrr)
+# make an SE where each row is an overlap
+se_rna <- SummarizedExperiment(
+  assays=list(rna=rna.scaled),
+  rowRanges=rna_Granges)
+se_promoter <- SummarizedExperiment(
+  assays=list(promoter=promoter.scaled),
+  rowRanges=promoter_Granges)
+
+# make an SE where each row is an overlap
+makeOverlapSE <- function(se_rna, se_promoter) {
+  idx <- rowRanges(se_rna) %>% join_overlap_inner(rowRanges(se_promoter),maxgap = 1000)
+  assay_x <- assay(se_rna, "rna")[ idx$gene, ]
+  assay_y <- assay(se_promoter, "promoter")[ idx$peak, ]
+  # this is needed to build the SE
+  rownames(assay_x) <- rownames(assay_y) <- seq_along( idx$gene )
+  new_ranges <- rowRanges(se_rna)[ idx$gene ]
+  names(new_ranges) <- seq_along( idx$gene )
+  SummarizedExperiment(
+    assays=list(x=assay_x, y=assay_y),
+    rowRanges=new_ranges
+  )
+}
+se <- makeOverlapSE(se_rna, se_promoter)
+se %>%
+  as_tibble() %>%
+  nest(data = -.feature) %>%
+  mutate(rho = map(data,
+                   function(data) data %>% summarize(rho = cor(x, y))
+  )) %>%
+  unnest(rho) %>%
+  select(-data)
+```
 
 
 ## Additional references
