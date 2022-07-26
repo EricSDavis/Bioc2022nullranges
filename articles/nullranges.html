@@ -563,9 +563,8 @@ than your original features, so <span class="math inline">\(\color{brown}{\text{
 trimming}}\)</span> extra metadata can help make the analysis more
 efficient.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">dhs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/nullrangesData/man/DHSA549Hg38.html" class="external-link">DHSA549Hg38</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; see ?nullrangesData and browseVignettes('nullrangesData') for documentation</span></span>
-<span><span class="co">#&gt; loading from cache</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">nullrangesData</span><span class="op">)</span></span>
+<span><span class="va">dhs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/nullrangesData/man/DHSA549Hg38.html" class="external-link">DHSA549Hg38</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">dhs</span> <span class="op">&lt;-</span> <span class="va">dhs</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">plyranges</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">signalValue</span> <span class="op">&gt;</span> <span class="fl">100</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">.</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>  <span class="fu">plyranges</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">id</span><span class="op">)</span></span>
@@ -632,44 +631,44 @@ block bootstrap</a> from the nullranges package.</p>
 <h4 id="subsampling-with-bootranges">Subsampling with bootRanges()<a class="anchor" aria-label="anchor" href="#subsampling-with-bootranges"></a>
 </h4>
 <p>Now we apply a segmented block bootstrap with blocks of size 500kb,
-to the peaks. Here we show generation of 10 iterations of a block
+to the peaks. Here we show generation of 20 iterations of a block
 bootstrap followed by a typical overlap analysis using
 <em>plyranges</em> <span class="citation">(Lee, Cook, and Lawrence
 2019)</span>. (We might normally do 100 iterations or more, depending on
 the granularity of the bootstrap distribution that is needed.)</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">5</span><span class="op">)</span> <span class="co"># for reproducibility</span></span>
-<span><span class="va">R</span> <span class="op">&lt;-</span> <span class="fl">10</span></span>
+<span><span class="va">R</span> <span class="op">&lt;-</span> <span class="fl">20</span></span>
 <span><span class="va">blockLength</span> <span class="op">&lt;-</span> <span class="fl">5e5</span></span>
 <span><span class="va">boots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://nullranges.github.io/nullranges/reference/bootRanges.html" class="external-link">bootRanges</a></span><span class="op">(</span><span class="va">dhs</span>, <span class="va">blockLength</span>, R <span class="op">=</span> <span class="va">R</span>, seg <span class="op">=</span> <span class="va">seg_cbs</span>, exclude<span class="op">=</span><span class="va">exclude</span><span class="op">)</span></span>
 <span><span class="va">boots</span></span>
-<span><span class="co">#&gt; bootRanges object with 62764 ranges and 4 metadata columns:</span></span>
-<span><span class="co">#&gt;           seqnames            ranges strand |        id     block  iter</span></span>
-<span><span class="co">#&gt;              &lt;Rle&gt;         &lt;IRanges&gt;  &lt;Rle&gt; | &lt;integer&gt; &lt;integer&gt; &lt;Rle&gt;</span></span>
-<span><span class="co">#&gt;       [1]     chr1     242791-242940      * |       347         5     1</span></span>
-<span><span class="co">#&gt;       [2]     chr1     256031-256180      * |       348         5     1</span></span>
-<span><span class="co">#&gt;       [3]     chr1     391535-391684      * |      5301         8     1</span></span>
-<span><span class="co">#&gt;       [4]     chr1     421046-421195      * |      5302         8     1</span></span>
-<span><span class="co">#&gt;       [5]     chr1     438186-438335      * |      5303         8     1</span></span>
-<span><span class="co">#&gt;       ...      ...               ...    ... .       ...       ...   ...</span></span>
-<span><span class="co">#&gt;   [62760]     chrY 22010887-22011036      * |      6075     12428    10</span></span>
-<span><span class="co">#&gt;   [62761]     chrY 25408146-25408295      * |      1826     12436    10</span></span>
-<span><span class="co">#&gt;   [62762]     chrY 26573840-26573989      * |       576     12439    10</span></span>
-<span><span class="co">#&gt;   [62763]     chrY 26595240-26595389      * |       577     12439    10</span></span>
-<span><span class="co">#&gt;   [62764]     chrY 28050177-28050326      * |      3027     12443    10</span></span>
-<span><span class="co">#&gt;           blockLength</span></span>
-<span><span class="co">#&gt;                 &lt;Rle&gt;</span></span>
-<span><span class="co">#&gt;       [1]      500000</span></span>
-<span><span class="co">#&gt;       [2]      500000</span></span>
-<span><span class="co">#&gt;       [3]      500000</span></span>
-<span><span class="co">#&gt;       [4]      500000</span></span>
-<span><span class="co">#&gt;       [5]      500000</span></span>
-<span><span class="co">#&gt;       ...         ...</span></span>
-<span><span class="co">#&gt;   [62760]      500000</span></span>
-<span><span class="co">#&gt;   [62761]      500000</span></span>
-<span><span class="co">#&gt;   [62762]      500000</span></span>
-<span><span class="co">#&gt;   [62763]      500000</span></span>
-<span><span class="co">#&gt;   [62764]      500000</span></span>
+<span><span class="co">#&gt; bootRanges object with 124933 ranges and 4 metadata columns:</span></span>
+<span><span class="co">#&gt;            seqnames            ranges strand |        id     block  iter</span></span>
+<span><span class="co">#&gt;               &lt;Rle&gt;         &lt;IRanges&gt;  &lt;Rle&gt; | &lt;integer&gt; &lt;integer&gt; &lt;Rle&gt;</span></span>
+<span><span class="co">#&gt;        [1]     chr1     242791-242940      * |       347         5     1</span></span>
+<span><span class="co">#&gt;        [2]     chr1     256031-256180      * |       348         5     1</span></span>
+<span><span class="co">#&gt;        [3]     chr1     391535-391684      * |      5301         8     1</span></span>
+<span><span class="co">#&gt;        [4]     chr1     421046-421195      * |      5302         8     1</span></span>
+<span><span class="co">#&gt;        [5]     chr1     438186-438335      * |      5303         8     1</span></span>
+<span><span class="co">#&gt;        ...      ...               ...    ... .       ...       ...   ...</span></span>
+<span><span class="co">#&gt;   [124929]     chrY 25284420-25284569      * |      1864     12436    20</span></span>
+<span><span class="co">#&gt;   [124930]     chrY 27272169-27272318      * |      2073     12441    20</span></span>
+<span><span class="co">#&gt;   [124931]     chrY 27508455-27508604      * |       921     12442    20</span></span>
+<span><span class="co">#&gt;   [124932]     chrY 27679815-27679964      * |       922     12442    20</span></span>
+<span><span class="co">#&gt;   [124933]     chrY 27839434-27839583      * |       923     12442    20</span></span>
+<span><span class="co">#&gt;            blockLength</span></span>
+<span><span class="co">#&gt;                  &lt;Rle&gt;</span></span>
+<span><span class="co">#&gt;        [1]      500000</span></span>
+<span><span class="co">#&gt;        [2]      500000</span></span>
+<span><span class="co">#&gt;        [3]      500000</span></span>
+<span><span class="co">#&gt;        [4]      500000</span></span>
+<span><span class="co">#&gt;        [5]      500000</span></span>
+<span><span class="co">#&gt;        ...         ...</span></span>
+<span><span class="co">#&gt;   [124929]      500000</span></span>
+<span><span class="co">#&gt;   [124930]      500000</span></span>
+<span><span class="co">#&gt;   [124931]      500000</span></span>
+<span><span class="co">#&gt;   [124932]      500000</span></span>
+<span><span class="co">#&gt;   [124933]      500000</span></span>
 <span><span class="co">#&gt;   -------</span></span>
 <span><span class="co">#&gt;   seqinfo: 24 sequences from hg38 genome</span></span></code></pre></div>
 <p>What is returned here? The <code>bootRanges</code> function returns a
@@ -736,12 +735,12 @@ the original feature set y.</p>
 <h3 id="derive-interested-statistics">Derive interested statistics<a class="anchor" aria-label="anchor" href="#derive-interested-statistics"></a>
 </h3>
 <p>Suppose we have a set of features <code>x</code> and we are
-interested in</p>
-<p>evaluating the enrichment of this set with the DHS. We can calculate
-for example the sum observed number of overlaps for features in
-<code>x</code> with DHS in whole genome (or something more complicated,
-e.g. the maximum log fold change or signal value for DHS peaks within a
-<code>maxgap</code> window of <code>x</code>).</p>
+interested in evaluating the <span class="math inline">\(\color{brown}{\text{enrichment of this set with
+the DHS}}\)</span>. We can calculate for example the sum observed number
+of overlaps for features in <code>x</code> with DHS in whole genome (or
+something more complicated, e.g. the maximum log fold change or signal
+value for DHS peaks within a <code>maxgap</code> window of
+<code>x</code>).</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/GenomicRanges/man/GRanges-class.html" class="external-link">GRanges</a></span><span class="op">(</span><span class="st">"chr2"</span>, <span class="fu"><a href="https://rdrr.io/pkg/IRanges/man/IRanges-constructor.html" class="external-link">IRanges</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="fl">50</span><span class="op">:</span><span class="fl">99</span> <span class="op">*</span> <span class="fl">1e6</span>, width<span class="op">=</span><span class="fl">1e6</span><span class="op">)</span>, x_id<span class="op">=</span><span class="fl">1</span><span class="op">:</span><span class="fl">50</span><span class="op">)</span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="va">x</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>n_overlaps <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/plyranges/man/ranges-count-overlaps.html" class="external-link">count_overlaps</a></span><span class="op">(</span><span class="va">.</span>, <span class="va">dhs</span><span class="op">)</span><span class="op">)</span></span>
