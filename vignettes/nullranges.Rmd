@@ -383,7 +383,8 @@ than your original features, so $\color{brown}{\text{filtering and trimming}}$
 extra metadata can help make the analysis more efficient.
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
+library(nullrangesData)
 dhs <- DHSA549Hg38()
 dhs <- dhs %>% plyranges::filter(signalValue > 100) %>%
   mutate(id = seq_along(.)) %>%
@@ -429,14 +430,14 @@ seg_cbs <- eh[["EH7307"]]
 
 #### Subsampling with bootRanges()
 Now we apply a segmented block bootstrap with blocks of size 500kb, to
-the peaks. Here we show generation of 10 iterations of a block bootstrap
+the peaks. Here we show generation of 20 iterations of a block bootstrap
 followed by a typical overlap analysis using *plyranges* [@Lee2019]. (We
 might normally do 100 iterations or more, depending on the granularity
 of the bootstrap distribution that is needed.)
 
 ```{r}
 set.seed(5) # for reproducibility
-R <- 10
+R <- 20
 blockLength <- 5e5
 boots <- bootRanges(dhs, blockLength, R = R, seg = seg_cbs, exclude=exclude)
 boots
@@ -493,9 +494,8 @@ combined %>% plyranges::filter(iter %in% 0:3) %>%
 ### Derive interested statistics
 
 Suppose we have a set of features `x` and we are interested in
-
-evaluating the enrichment of this set with the DHS. We can calculate for
-example the sum observed number of overlaps for features in `x`  with DHS in
+evaluating the $\color{brown}{\text{enrichment of this set with the DHS}}$. 
+We can calculate for example the sum observed number of overlaps for features in `x`  with DHS in
 whole genome (or something more complicated, e.g. the maximum log fold change or signal
 value for DHS peaks within a `maxgap` window of `x`).
 
