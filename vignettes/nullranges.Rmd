@@ -33,12 +33,12 @@ colocalization of two observed feature sets. The package has two
 approaches for generating null feature sets, *matching* and
 *bootstrapping*:
     
-* Matched subsampling with matchRanges:
+* Matched subsampling with `matchRanges`:
 
     Subsampling from a pool of features, but controlling for certain
     characteristics.
 
-* Bootstrapping with bootRanges:
+* Bootstrapping with `bootRanges`:
     
     Subsampling from original features, but controlling for their spatial pattern
 
@@ -73,7 +73,7 @@ features in $y'$ may be characterized by:
    genome but controlling for their spatial pattern
 
 
-### Releated work
+### Related work
 
 For general considerations of generation of null feature sets or
 segmentation for enrichment or colocalization analysis, consider the
@@ -134,8 +134,8 @@ An example for a 45-minute workshop:
 ### Learning goals
 
 * Understand matching vs bootstrapping for nullranges
-* Using matchRanges to generate covarite-matched subsets
-* Using bootRanges to generate block bootstrapped ranges
+* Using `matchRanges` to generate covarite-matched subsets
+* Using `bootRanges` to generate block bootstrapped ranges
 * Integrating nullranges with plyranges
 
 ### Learning objectives
@@ -146,7 +146,7 @@ An example for a 45-minute workshop:
     * Compare biological results
 * bootRanges
     * Generate block bootstrapped null sets of GenomicRanges
-    * Assess quality of subsampling sets
+    * Assess quality of bootstrap sampled sets
     * Use with plyranges to derive biological results
 
 
@@ -259,8 +259,12 @@ focal and matched sets.
 
 #### Visualizing matching results
 
-Let's visualize covariate balance by plotting propensity scores
-for the focal, pool, and matched sets: 
+Let's visualize covariate balance by plotting *propensity scores*
+for the focal, pool, and matched sets. Briefly, a propensity score is
+a modeled probability that a range would fall in the focal or pool
+set, based on the values of the covariates we specified in
+`covar`. Using propensity scores instead of matching directly on the
+covariates helps in particular when there are multiple covariates.
 
 ```{r, message=FALSE}
 plotPropensity(mgr, sets = c('f', 'p', 'm'), type = 'ridges')
@@ -279,6 +283,9 @@ library(patchwork)
 plots <- lapply(covariates(mgr), plotCovariate, x=mgr, sets = c('f', 'm', 'p'))
 Reduce('/', plots)
 ```
+
+Across both covariates, the matched set is close to the distribution
+of the focal set.
 
 ### Compare CTCF sites
 
@@ -306,6 +313,11 @@ barplot(height = c(g1, g2, g3),
         las = 1)
 ```
 
+Here we see, while both pool and matched sets have reduced CTCF
+occupancy, some of the difference between looped and unlooped is
+explainable through the covariates alone. We therefore obtain a more
+meaningful difference due to looping when matching on those
+covariates. 
 
 ## Block bootstrapping with bootRanges
 
@@ -343,7 +355,7 @@ $\color{brown}{\text{estimating the variance of the null distribution}}$, compar
 knitr::include_graphics("images/comparsion.jpeg")
 ```
 
-### Overview
+### Overview of segmented block bootstrap
 
 In a segmented block bootstrap, the blocks are sampled and placed within
 regions of a genome *segmentation*. That is, for a genome segmented into
@@ -356,26 +368,31 @@ block across chromosome within same states.
 An example workflow of bootRanges used in combination with plyranges
 is diagrammed in (B), and can be summarized as:
 
-1.  Overlap *GRanges* of feature $x$ and *GRanges* of feature $y$ to
-    derive interested observed statistics
-2.  `bootRanges()` with optional `segmentation` and `exclude` creates a
+1.  Compute overlap between *GRanges* of feature $x$ and *GRanges* of
+    feature $y$ to assess overlap or to derive other statistic of
+    interest
+2.  `bootRanges()` with optional `segmentation` and `exclude` to create a
     *bootRanges* object $y'$
-3.  Overlap *GRanges* of feature $x$ and $y'$ to derive interested
-    bootstrap statistics
-4.  $z$ test is performed for testing the null hypothesis that there is
-    no true biological enrichment
+3.  Compute overlap between *GRanges* of feature $x$ and $y'$ to
+    derive bootstrap distribution of statistics
+4.  A $z$ test can be performed for testing the null hypothesis that
+    there is no true biological enrichment of the original data (that
+    bootstrap data often has as high an enrichment as the observed
+    data)
     
 ```{r, echo=FALSE, fig.alt="Overview of bootRanges"}
 knitr::include_graphics("images/bootRanges.jpg")
 ```
 
-### Segmented block bootstrap
+### Bootstrapping DHS from ENCODE
 
-We demonstrate usage by loading a set of DNase hypersensitivity sites (DHS) from the ENCODE
-project [@encode] in A549 cell line (ENCSR614GWM). Here, for speed, we
-work with a pre-processed data object from the nullrangesData package.
+We demonstrate usage by loading a set of DNase hypersensitivity sites
+(DHS) from the ENCODE 
+project [@encode] in A549 cell line (ENCSR614GWM).
+We work with a pre-processed data object from the nullrangesData
+package. 
 
-For speed of the vignette, we restrict to a smaller number of DHS,
+For speed of the demo, we restrict to a smaller number of DHS,
 filtering by the signal value. We also remove metadata columns that we
 don't need for the bootstrap analysis. Consider, when creating
 bootstrapped data, that you will be creating an object many times larger
@@ -427,13 +444,22 @@ from the nullranges package.
 seg_cbs <- eh[["EH7307"]]
 ```
 
+We next import excluded regions including ENCODE-produced excludable
+regions[@encode_exclude], telomeres from UCSC, centromeres [@rCGH]. For
+easy use, pre-combined excludable regions is stored in
+*ExperimentHub.* See the 
+[excluderanges](https://mdozmorov.github.io/excluderanges/)
+package for more detail.
 
-#### Subsampling with bootRanges()
+```{r}
+exclude <- eh[["EH7306"]]
+```
+#### Bootstrap sampling with `bootRanges()`
+
 Now we apply a segmented block bootstrap with blocks of size 500kb, to
-the peaks. Here we show generation of 20 iterations of a block bootstrap
-followed by a typical overlap analysis using *plyranges* [@Lee2019]. (We
-might normally do 100 iterations or more, depending on the granularity
-of the bootstrap distribution that is needed.)
+the peaks. Here we show generation of 10 iterations of a block bootstrap
+We might normally do 100 iterations or more, depending on the granularity
+of the bootstrap distribution that is needed.
 
 ```{r}
 set.seed(5) # for reproducibility
@@ -448,9 +474,11 @@ object, which is a simple sub-class of *GRanges*. The iteration (`iter`)
 and the block length (`blockLength`) are recorded as metadata columns,
 accessible via `mcols`. 
 
-### Assessing quality of subsampling
+### Assessing quality of bootstrap samples
 
-We can examine properties of permuted y over iterations, and compare to the original y. To do so, we first add the original features as iter=0. Then compute summaries:
+We can examine properties of permuted y over iterations, and compare
+to the original y. To do so, we first add the original features as
+iter=0. Then compute summaries: 
 
 ```{r}
 suppressPackageStartupMessages(library(tidyr))
@@ -465,7 +493,9 @@ stats <- combined %>%
 head(stats)
 ```
 
-We can also look at distributions of various aspects, e.g. here the inter-feature distance of features, across a few of the bootstraps and the original feature set y.
+We can also look at distributions of various aspects, e.g. here the
+inter-feature distance of features, across a few of the bootstraps and
+the original feature set y. 
 
 ```{r, warning=FALSE}
 suppressPackageStartupMessages(library(ggridges))
@@ -473,7 +503,9 @@ suppressPackageStartupMessages(library(purrr))
 interdist <- function(dat) {
     x = dat[-1,]
     y = dat[-nrow(dat),]
-    ifelse(x$seqnames == y$seqnames, x$start + floor((x$width - 1)/2) - y$start-floor((y$width - 1)/2), NA)}
+    ifelse(x$seqnames == y$seqnames,
+           x$start + floor((x$width - 1)/2) -
+           y$start-floor((y$width - 1)/2), NA)}
 
 combined %>% plyranges::filter(iter %in% 0:3) %>%
   plyranges::select(iter) %>%
@@ -488,10 +520,9 @@ combined %>% plyranges::filter(iter %in% 0:3) %>%
   geom_text(data=head(stats,4),
             aes(x=1.5, y=iter, label=paste0("n=",n), fill=NULL),
             vjust=1.5)
-
 ```
 
-### Derive interested statistics
+### Derive statistics of interest
 
 Suppose we have a set of features `x` and we are interested in
 evaluating the $\color{brown}{\text{enrichment of this set with the DHS}}$. 
@@ -528,13 +559,11 @@ overlap in `x`, one can also group by both (`block`,`iter`). 10,000 total
 blocks may therefore be sufficient to derive a bootstrap distribution, 
 avoiding the need to generate many bootstrap genomes of data.
 
-
 Finally we can plot a histogram. In this case, as the `x` features were
-arbitrary, our observed value falls within the distribution of mean
-overlap with bootstrapped data.
+arbitrary, our observed value falls within the bootstrap distribution.
 
 ```{r boot-hist}
-ggplot(boot_stats, aes(meanOverlaps)) +
+ggplot(boot_stats, aes(n_overlaps)) +
   geom_histogram()
 ```
 
@@ -547,7 +576,11 @@ book.
 
 #### Optimized effect size threshold
 
-Penalized splines across a range of effect sizes on the null sets can be modeled, through which to derive confidence interval at the same time on every effect size. Therefore, an optimized effect size threshold could be derived, eg. rather than limiting DEG logFC at a arbitrary threshold.
+Penalized splines across a range of effect sizes on the null sets can
+be modeled, through which to derive confidence interval at the same
+time on every effect size. Therefore, an optimized effect size
+threshold could be derived, eg. rather than limiting DEG logFC at a
+arbitrary threshold. 
 
 ```{r, echo=FALSE, fig.alt="effect size",out.width="50%",fig.align='center'}
 knitr::include_graphics("images/effectSize.jpeg")
@@ -559,8 +592,19 @@ Instead of deriving statistics of interest from *GRanges* metadata column, count
 correlation of the all pairs of genes and promoter peaks from Chromium
 Single Cell Multiome ATAC + Gene Expression. 
 
+*bootRanges* is flexible on deriving any interested statistics through
+genome position, but also is flexible on using data from other
+formats, eg. *SummerizedExperiment*. One case study is to assess the
+correlation of the all pairs of genes and promoter peaks from Chromium
+Single Cell Multiome ATAC + Gene Expression. There are two option
+pipelines to follow after generating a GRanges object and extracting
+count matrix from *SingleCellExperiment*. One is saving the count
+matrix in GRanges's metadata column as a `NumericList()` format and
+use *Plyranges* in downstream analysis. Another one is creating a
+*tidySummarizedExperiment* object where each row save derived
+interested statistics. 
 
-* Plyrangs pseudo code
+* Plyranges pseudo code
 saving the count matrix in GRanges's metadata column as a `NumericList()` format and
 use *Plyranges* in downstream analysis.
 ```{r, eval=FALSE}
@@ -617,6 +661,5 @@ se %>%
   unnest(rho) %>%
   select(-data)
 ```
-
 
 ## Additional references
