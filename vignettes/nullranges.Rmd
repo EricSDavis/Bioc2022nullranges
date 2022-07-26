@@ -40,8 +40,7 @@ approaches for generating null feature sets, *matching* and
 
 * Bootstrapping with `bootRanges`:
     
-    Sampling large blocks of features within the segments from the original set
-with replacement.
+    Subsampling from original features, but controlling for their spatial pattern
 
 In this workshop, we will demonstrate the two major approaches for
 generating null hypothesis genomic ranges with the `nullranges`
@@ -70,8 +69,8 @@ features in $y'$ may be characterized by:
 
 1. Matching -- drawing from a pool of features but controlling for 
    certain characteristics
-2. Bootstrapping -- placing a number of artificial features in the 
-   genome but controlling for their spatial distribution
+2. Block Bootstrapping -- placing a number of artificial features in the 
+   genome but controlling for their spatial pattern
 
 
 ### Related work
@@ -91,11 +90,15 @@ Methods implemented outside of Bioconductor include
 [GREAT](http://bejerano.stanford.edu/great/public/html/) [@GREAT],
 [GenometriCorr](https://github.com/favorov/GenometriCorr) [@GenometriCorr],
 or [ChIP-Enrich](http://chip-enrich.med.umich.edu/) [@ChIP-Enrich].
-We note that our block bootstrapping approach closely follows that of 
-[GSC](https://github.com/ParkerLab/encodegsc), while offering
+Note that our block bootstrapping idea motivated from 
+[GSC](https://github.com/ParkerLab/encodegsc). In order to address 
+computationally intensive issue, [GSC](https://github.com/ParkerLab/encodegsc) 
+implements a strategy of swapping pairs of blocks in order to 
+generate bootstrap distribution while avoiding
+generation of a genome-scale bootstrap sample. We uses efficient 
+vectorized code for operation on *GRanges* objects [@granges] to offer $\color{brown}{\text{genome-scale}}$ bootstrap data with
 additional features/visualizations, and is re-implemented within
-R/Bioconductor with efficient vectorized code for operation on 
-*GRanges* objects [@granges].
+R/Bioconductor.
 
 ### Pre-requisites
 
@@ -325,9 +328,9 @@ doesn't have a focal/pool structure as above
 is to permute or shuffle the genomic features, possibly while
 considering an exclusion list of regions where features should not be
 located. However, genomic feature sets often exhibit a
-complex dependency structure, both in terms of their spatial pattern, 
-and in terms of local correlation
-of metadata (signal strength, cell-type-specificity, etc.) 
+$\color{olive}{\text{complex dependency structure}}$, both in terms of their $\color{brown}{\text{spatial pattern}}$, 
+and in terms of $\color{brown}{\text{local correlation of metadata}}$ 
+(signal strength, cell-type-specificity, etc.) 
 Naive permutation ignores the dependence between positions and thus won't
 exhibits natural clumping properties. An alternative way is to generate
 random feature sets by sampling large blocks of features within the
@@ -337,7 +340,7 @@ segments from the original set with replacement, as proposed by
 Below, we see that various features (GC content, gene density, and CRE
 location) exhibit spatial patterns easily discernible at the scale of 500kb.
 
-```{r, echo=FALSE, fig.alt="bootRanges motivation",fig.width=5, fig.height=2,fig.align='center'}
+```{r, echo=FALSE, fig.alt="bootRanges motivation",out.width="50%",fig.align='center'}
 knitr::include_graphics("images/UCSC.jpg")
 ```
 
@@ -345,10 +348,10 @@ Below are histograms from @bickel_2010 showing various ways of
 estimating the null distribution of overlaps between two sequences,
 with the true null on top (known as the sequences are generated from a
 random process, and so additional sequences can be generated). The
-block bootstrap can do a much better job of estimating the variance of
-the null distribution, compared to naive permutation of features.
+block bootstrap can do a much better job of 
+$\color{brown}{\text{estimating the variance of the null distribution}}$, compared to naive permutation of features.
 
-```{r, echo=FALSE, fig.alt="Histogram comparison",fig.align='center'}
+```{r, echo=FALSE, fig.alt="Histogram comparison",out.width="50%",fig.align='center'}
 knitr::include_graphics("images/comparsion.jpeg")
 ```
 
@@ -358,8 +361,9 @@ In a segmented block bootstrap, the blocks are sampled and placed within
 regions of a genome *segmentation*. That is, for a genome segmented into
 states 1,2,...,S, blocks from state *s* will be used to tile the ranges
 of state *s* in each bootstrap sample. The process can be visualized in
-(A), a block with length $L_b$ is randomly selected from state "red" and
-move to a tile block across chromosome. 
+(A), a block with length $L_b$ is $\color{brown}{\text{randomly}}$ 
+selected from state "red" and move to a $\color{brown}{\text{tile}}$ 
+block across chromosome within same states. 
 
 An example workflow of bootRanges used in combination with plyranges
 is diagrammed in (B), and can be summarized as:
@@ -392,16 +396,31 @@ For speed of the demo, we restrict to a smaller number of DHS,
 filtering by the signal value. We also remove metadata columns that we
 don't need for the bootstrap analysis. Consider, when creating
 bootstrapped data, that you will be creating an object many times larger
-than your original features, so filtering and trimming extra metadata
-can help make the analysis more efficient.
+than your original features, so $\color{brown}{\text{filtering and trimming}}$
+extra metadata can help make the analysis more efficient.
 
-```{r}
+
+```{r, message=FALSE, warning=FALSE}
+library(nullrangesData)
 dhs <- DHSA549Hg38()
 dhs <- dhs %>% plyranges::filter(signalValue > 100) %>%
   mutate(id = seq_along(.)) %>%
   plyranges::select(id)
 dhs
 table(seqnames(dhs))
+```
+
+#### Import excluded regions 
+
+$\color{brown}{\text{To avoid placing bootstrap features into regions of the genome that don’t typically have features}}$. We next import excluded regions including ENCODE-produced excludable
+regions[@encode_exclude], telomeres from UCSC, centromeres [@rCGH]. For
+easy use, pre-combined excludable regions is stored in *ExperimentHub.*
+
+```{r, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(ExperimentHub))
+eh = ExperimentHub()
+# query(eh, "nullrangesdata")
+exclude <- eh[["EH7306"]]
 ```
 
 #### Pre-built segmentations
@@ -414,21 +433,16 @@ The segmented block bootstrap has two options, either:
     AnnotationHub or external to Bioconductor (BED files imported with
     *rtracklayer*)
     
-*nullranges* has generated pre-built segmentations for easy use using
-*CBS* or *HMM* methods under hg38 with $L_s=2e6$ considering
-excludable regions can be selected from *ExperimentHub*. Assessment of
+`segmentDensity()` from *nullranges* provide first option by *CBS* or *HMM* methods. Here we loaded pre-built segmentations for easy use in hg38 with $L_s=2e6$ considering
+excludable regions. Assessment of
 segmentation through ranges plot, bar plot and box plot could be
 plotted by `plotSegment()`. Detailed Usage is shown in vignette
 [Segmented block bootstrap](https://nullranges.github.io/nullranges/articles/segmented_boot_ranges.html)
 from the nullranges package. 
 
 ```{r, message=FALSE, warning=FALSE}
-suppressPackageStartupMessages(library(ExperimentHub))
-eh = ExperimentHub()
-# query(eh, "nullrangesdata")
 seg_cbs <- eh[["EH7307"]]
 ```
-#### Import excluded regions 
 
 We next import excluded regions including ENCODE-produced excludable
 regions[@encode_exclude], telomeres from UCSC, centromeres [@rCGH]. For
@@ -449,7 +463,7 @@ of the bootstrap distribution that is needed.
 
 ```{r}
 set.seed(5) # for reproducibility
-R <- 10
+R <- 20
 blockLength <- 5e5
 boots <- bootRanges(dhs, blockLength, R = R, seg = seg_cbs, exclude=exclude)
 boots
@@ -476,6 +490,7 @@ stats <- combined %>%
   group_by(iter) %>%
   summarize(n = n()) %>%
   as_tibble()
+head(stats)
 ```
 
 We can also look at distributions of various aspects, e.g. here the
@@ -502,18 +517,17 @@ combined %>% plyranges::filter(iter %in% 0:3) %>%
   mutate(type = ifelse(iter == 0, "original", "boot")) %>% 
   ggplot(aes(log10(interdist), iter, fill=type)) +
   geom_density_ridges(alpha = 0.75) +
-  geom_text(data=head(stats,3),
-            aes(x=2, y=iter, label=paste0("n=",n), fill=NULL),
+  geom_text(data=head(stats,4),
+            aes(x=1.5, y=iter, label=paste0("n=",n), fill=NULL),
             vjust=1.5)
 ```
 
 ### Derive statistics of interest
 
 Suppose we have a set of features `x` and we are interested in
-evaluating the overlap of this set with the DHS. We can calculate for
-example the sum observed number of overlaps for features in `x` in
-whole genome (or 
-something more complicated, e.g. the maximum log fold change or signal
+evaluating the $\color{brown}{\text{enrichment of this set with the DHS}}$. 
+We can calculate for example the sum observed number of overlaps for features in `x`  with DHS in
+whole genome (or something more complicated, e.g. the maximum log fold change or signal
 value for DHS peaks within a `maxgap` window of `x`).
 
 ```{r}
@@ -523,24 +537,27 @@ sum( x$n_overlaps )
 ```
 
 We can repeat this with the bootstrapped features using a `group_by`
-command, and a `summarize` command.
-Note that we need to use `tidyr::complete` in order to fill in
-combinations of `iter` where the overlap was 0.
+command, a `summarize`.
+It may help to step through these commands one by one to understand what
+the intermediate output is.
+
+Note that we need to use `tidyr::complete` in order to fill in `iter` where the overlap was 0.
 
 ```{r}
 boot_stats <- x %>% join_overlap_inner(boots) %>%
   group_by(iter) %>%
   summarize(n_overlaps = n()) %>%
   as.data.frame() %>%
-  complete(iter, fill=list(n_overlaps = 0))
+  complete(iter, fill=list(n_overlaps = 0)) 
 ```
 
-If one is interested in assessing the mean observed number of overlaps
-per feature in `x`, instead of
-of genome-wide statistics, one can also group by both
-(`block`,`iter`). 10,000 total blocks may therefore be sufficient
-to derive a bootstrap distribution, avoiding the need to generate many
-bootstrap genomes of data.
+
+If one is interested in assessing a $\color{brown}{\text{feature-wise}}$ 
+statistics instead of $\color{brown}{\text{genome-wise}}$ statistics, 
+eg.,the mean observed number of overlaps per feature or mean base pair 
+overlap in `x`, one can also group by both (`block`,`iter`). 10,000 total 
+blocks may therefore be sufficient to derive a bootstrap distribution, 
+avoiding the need to generate many bootstrap genomes of data.
 
 Finally we can plot a histogram. In this case, as the `x` features were
 arbitrary, our observed value falls within the bootstrap distribution.
@@ -569,7 +586,11 @@ arbitrary threshold.
 knitr::include_graphics("images/effectSize.jpeg")
 ```
 
-#### Utilizing count matrix from other data formats
+#### Derive statistics of interest from other formats
+
+Instead of deriving statistics of interest from *GRanges* metadata column, count matrix from *SummerizedExperiment* or *SingleCellExperiment* could also be used. One case study is to assess the
+correlation of the all pairs of genes and promoter peaks from Chromium
+Single Cell Multiome ATAC + Gene Expression. 
 
 *bootRanges* is flexible on deriving any interested statistics through
 genome position, but also is flexible on using data from other
@@ -583,7 +604,9 @@ use *Plyranges* in downstream analysis. Another one is creating a
 *tidySummarizedExperiment* object where each row save derived
 interested statistics. 
 
-* Plyrangs pseudo code
+* Plyranges pseudo code
+saving the count matrix in GRanges's metadata column as a `NumericList()` format and
+use *Plyranges* in downstream analysis.
 ```{r, eval=FALSE}
 ## split sparse count matrix into NumericList
 rna <- rna_Granges[-which(rna.sd==0)] %>%
@@ -603,6 +626,7 @@ cor_whole<-rna %>% join_overlap_inner(bootranges, maxgap=1000) %>%
 
 * TidySE pesudo code
 
+Or creating a *SummarizedExperiment* object and use *tidySummarizedExperiment* to derive statistics of interest. 
 ```{r, eval=FALSE}
 library(tidySummarizedExperiment)
 ## make an SE where each row is an overlap
