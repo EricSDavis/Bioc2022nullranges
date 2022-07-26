@@ -506,21 +506,18 @@ sum( x$n_overlaps )
 ```
 
 We can repeat this with the bootstrapped features using a `group_by`
-command, a `summarize`, followed by a second `group_by` and `summarize`.
+command, a `summarize`.
 It may help to step through these commands one by one to understand what
 the intermediate output is.
 
-Note that we need to use `tidyr::complete` in order to fill in
-combinations of `x` and `iter` where the overlap was 0.
+Note that we need to use `tidyr::complete` in order to fill in `iter` where the overlap was 0.
 
 ```{r}
 boot_stats <- x %>% join_overlap_inner(boots) %>%
   group_by(iter) %>%
   summarize(n_overlaps = n()) %>%
   as.data.frame() %>%
-  complete(iter, fill=list(n_overlaps = 0)) %>%
-  group_by(iter) %>%
-  summarize(meanOverlaps = sum(n_overlaps))
+  complete(iter, fill=list(n_overlaps = 0)) 
 ```
 
 
